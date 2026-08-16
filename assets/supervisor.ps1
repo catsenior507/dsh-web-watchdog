@@ -26,6 +26,10 @@ $script:lastProc = $null
 $script:lastOut = ''
 $script:lastErr = ''
 
+# 清理遗留的重启请求标记：上一个监督进程未正常消费就会留下陈旧标记，
+# 若不清理，本进程会误把刚拉起的宿主当作“计划重启”立即杀死（自动关闭）。
+if (Test-Path $RequestFlag) { Remove-Item $RequestFlag -Force }
+
 if (-not (Test-Path $CrashLog)) {
   Set-Content -Path $CrashLog -Value '# dsh web watchdog 异常退出记录' -Encoding UTF8
 }
@@ -106,7 +110,7 @@ while ($true) {
     Start-Sleep -Seconds 2
     $check = Get-Process -Id $HostPid -ErrorAction SilentlyContinue
     if ($null -eq $check) { break }
-    if (Test-Path $RequestFlag) { $alive = $check; break }
+    if (Test-Path $RequestFlag) { Remove-Item $RequestFlag -Force; $alive = $check; break }
   }
   $wasPlanned = ($null -ne $alive)
 
