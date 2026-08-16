@@ -16,7 +16,8 @@ param(
   [Parameter(Mandatory=$true)][string]$StateFile,     # 连续崩溃计数（跨监督进程持久化）
   [int]$MaxRestarts = 10,
   [int]$BackoffStartSec = 10,
-  [int]$BackoffMaxSec = 600
+  [int]$BackoffMaxSec = 600,
+  [string]$EnvFile = ''                            # 宿主环境快照 JSON（WMI 创建不继承环境，重启前恢复）
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -69,7 +70,24 @@ function Set-RestartCount([int]$value) {
   Set-Content -Path $StateFile -Value $value -Encoding ASCII
 }
 
+function Restore-HostEnv {
+  # WMI Win32_Process.Create 创建的进程不继承调用者环境变量：
+  # 重启宿主前从快照恢复 PATH/USERPROFILE 等，否则新宿主环境残缺。
+  if ($EnvFile -eq '' -or -not (Test-Path $EnvFile)) { return }
+  try {
+    $envJson = Get-Content $EnvFile -Raw | ConvertFrom-Json
+    $envJson.PSObject.Properties | ForEach-Object {
+      if ($_.Name -notmatch '^(SYSTEMROOT|SYSTEMDRIVE|WINDIR|TEMP|TMP|OS|PROCESSOR_|NUMBER_OF_PROCESSORS|PATHEXT|COMSPEC|PROMPT|USERNAME)$') {
+        Set-Item -Path ("Env:" + $_.Name) -Value ([string]$_.Value) -ErrorAction SilentlyContinue
+      }
+    }
+  } catch {
+    # 快照损坏时跳过，宿主的绝对路径参数仍然可用
+  }
+}
+
 function Start-Host([string]$stamp) {
+  Restore-HostEnv
   $outFile = Join-Path $LogDir "host-$stamp.out.log"
   $errFile = Join-Path $LogDir "host-$stamp.err.log"
   $argsList = @('--no-warnings', $BinPath)

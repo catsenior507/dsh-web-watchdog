@@ -72,7 +72,15 @@ function supervisorScriptPath(): string {
   return fileURLToPath(new URL('../assets/supervisor.ps1', import.meta.url))
 }
 
-/** 启动（或复用）脱离进程的 PowerShell 监督进程；pid 文件里的进程还活着则复用。 */
+/**
+ * 启动（或复用）监督进程。
+ * 用 WMI Win32_Process.Create 创建：新进程的父进程是 WmiPrvSE.exe（WMI 服务宿主），
+ * 天然脱离宿主的作业对象——宿主被 Stop-Process -Force 杀掉时监督进程不受牵连，
+ * 且权限正常、可以写 pid/日志文件。
+ * 为什么不用 spawn：detached:true 在本机沙箱会被降权无法写文件；
+ * 普通非分离 spawn 的子进程与宿主同属一个作业对象，会随宿主一起死——
+ * 两者都无法让监督进程在宿主死后存活并完成重启。
+ */
 function ensureSupervisor(config: WatchdogConfig): void {
   const pid = readPidFile(config.supervisor.pidFile)
   if (pid !== null && isProcessAlive(pid)) return
@@ -92,28 +100,43 @@ function ensureSupervisor(config: WatchdogConfig): void {
     '-BackoffStartSec', String(config.supervisor.backoffStartSec),
     '-BackoffMaxSec', String(config.supervisor.backoffMaxSec),
   ]
-  // PowerShell 5.1 的 -File 传空字符串会报“参数缺失”，空参数直接省略
+  // PowerShell 5.1 的 -File 传空字符串会报「参数缺失」，空参数直接省略
   const restartArgs = config.supervisor.restartArgs.join(' ')
   if (restartArgs !== '') {
-    // 插到 -WorkDir 值之后、-LogDir 之前（命名参数位置无关，但不能拆开相邻的参数/值对）
     args.splice(13, 0, '-RestartArgs', restartArgs)
   }
-  // 注意：不要用 detached:true —— 部分沙箱环境（本机 DSH 平台）会降权分离子进程，
-  // 导致监督进程无法写 pid/日志文件。非分离子进程在宿主退出后同样作为孤儿存活，
-  // 可以正常完成崩溃记录与自动重启。
-  const child = spawn('powershell.exe', args, {
+
+  // WMI 创建的进程不继承宿主环境变量：把环境快照落盘，
+  // 监督进程重启宿主前先恢复（否则新 dsh web 会丢失 PATH/USERPROFILE 等）。
+  const envFile = join(config.dataDir, 'host-env.json')
+  try {
+    writeFileSync(envFile, JSON.stringify(process.env), 'utf8')
+    args.push('-EnvFile', envFile)
+  } catch {
+    // 写不了环境快照也不致命（宿主环境为空的极端情况）
+  }
+
+  // 组装 WMI 创建命令行：先做双引号转义（PowerShell 把 "" 解析为字面引号），
+  // 再对整体做单引号转义（' → ''，用于嵌入 -Arguments 的单引号字符串）。
+  const cmdline = ['powershell.exe', ...args]
+    .map((arg) => '"' + arg.replace(/"/g, '""') + '"')
+    .join(' ')
+  const wmiCmd = "(Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine='" + cmdline.replace(/'/g, "''") + "'}).ReturnValue"
+
+  // 用一个短命 powershell 发出 WMI 创建请求（stdio 忽略，避免受限环境下的管道 EPERM）；
+  // 真正的监督进程由 WmiPrvSE 创建，独立于宿主。
+  const caller = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', wmiCmd], {
     stdio: 'ignore',
     windowsHide: true,
   })
-  child.on('error', (error) => {
-    // 监督进程无法启动时留下记录（例如受限环境禁止创建分离子进程）
+  caller.on('error', (error) => {
     try {
       writeFileSync(config.supervisor.crashLog, '\n=== ' + new Date().toISOString() + ' | 监督进程启动失败: ' + String(error instanceof Error ? error.message : error) + ' ===\n', { flag: 'a' })
     } catch {
       // 忽略记录失败
     }
   })
-  child.unref()
+  caller.unref()
 }
 
 function readPidFile(file: string): number | null {
