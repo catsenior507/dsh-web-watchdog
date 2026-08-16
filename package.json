@@ -1,0 +1,49 @@
+{
+  "name": "@dsh-external/dsh-client-plugin-web-watchdog",
+  "description": "Watchdog for the dsh web GUI: crash logging + exponential-backoff auto-restart supervisor + status panel",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@types/node": "^20.12.10",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "lightningcss": "^1.32.0",
+    "tsdown": "0.22.14",
+    "typescript": "^5.4.5",
+    "vitest": "4.1.10"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "assets",
+    "src",
+    "README.md",
+    "LICENSE"
+  ]
+}

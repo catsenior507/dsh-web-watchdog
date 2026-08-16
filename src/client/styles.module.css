@@ -1,0 +1,135 @@
+/* dsh-web-watchdog panel styles — dark neutral theme */
+.launcher {
+  position: fixed;
+  right: 84px;
+  bottom: 22px;
+  z-index: 2147482990;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(143, 195, 255, 0.45);
+  background: linear-gradient(145deg, #15243a, #0d1726);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(114, 152, 152, 0.18);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.launcher:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(143, 195, 255, 0.35);
+}
+.panel {
+  position: fixed;
+  z-index: 2147482991;
+  right: 22px;
+  bottom: 84px;
+  width: min(560px, calc(100vw - 44px));
+  height: min(520px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid rgba(143, 195, 255, 0.25);
+  background: linear-gradient(160deg, rgba(16, 24, 36, 0.97), rgba(9, 14, 21, 0.97));
+  color: #d8e2ee;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+}
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, rgba(114, 152, 152, 0.2), rgba(143, 195, 255, 0.08));
+  border-bottom: 1px solid rgba(143, 195, 255, 0.16);
+  flex: 0 0 auto;
+}
+.title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #dce9f7;
+}
+.spacer { flex: 1; }
+.winBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(143, 195, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: #9fc3bd;
+  cursor: pointer;
+  font-size: 13px;
+}
+.winBtn:hover { background: rgba(143, 195, 255, 0.16); color: #e6fff2; }
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 195, 255, 0.3) transparent;
+}
+.card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(143, 195, 255, 0.14);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.cardTitle { font-weight: 650; color: #dce9f7; font-size: 13px; margin-bottom: 8px; }
+.grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; align-items: center; }
+.row { display: flex; align-items: center; gap: 8px; }
+.chip {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 195, 255, 0.25);
+  color: #9fc3bd;
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.chipGreen { color: #9ef0bd; border-color: rgba(133, 227, 174, 0.45); }
+.chipAmber { color: #f3c979; border-color: rgba(243, 201, 121, 0.45); }
+.muted { color: #7fa39e; font-size: 11.5px; }
+.mono { font-family: 'Cascadia Code', Consolas, monospace; font-size: 11.5px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.dotOk { background: #85e3ae; box-shadow: 0 0 6px rgba(133, 227, 174, 0.8); }
+.dotBad { background: #ff9d8a; box-shadow: 0 0 6px rgba(255, 157, 138, 0.8); }
+.logBox {
+  max-height: 220px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(143, 195, 255, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #b9cdd9;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(143, 195, 255, 0.3);
+  background: rgba(114, 152, 152, 0.18);
+  color: #dce9f7;
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn:hover { background: rgba(143, 195, 255, 0.22); }
+.btnDanger { border-color: rgba(255, 157, 138, 0.4); color: #ffb4a6; background: rgba(214, 116, 25, 0.1); }
+.btnDanger:hover { background: rgba(214, 116, 25, 0.25); }
+.btnSmall { padding: 2px 8px; font-size: 11px; }
+.errorBanner {
+  background: rgba(214, 116, 25, 0.16);
+  border: 1px solid rgba(214, 116, 25, 0.4);
+  color: #ffc9a0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+}

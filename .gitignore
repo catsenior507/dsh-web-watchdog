@@ -1,0 +1,4 @@
+node_modules/
+wd-test-data/
+web-logs/
+*.log
