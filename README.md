@@ -53,6 +53,8 @@ curl -X POST http://127.0.0.1:4795/api/watchdog/restart
 - `npm run build` —— tsdown 产出 host half（`lib/index.js`）与 browser half（`lib/client.js`）；
 - `node test-isolated.mjs` —— 隔离端到端测试：监督进程拉起、崩溃记录、自动重启、
   计划重启、监督交接（不接触真实 dsh web 进程）。
+- `node test-deployment.mjs` —— **真实部署形态**端到端测试：假宿主通过插件的 WMI 机制拉起监督进程，
+  再用 Stop-Process -Force 硬杀宿主，验证监督进程独立存活、恢复宿主环境、写崩溃记录并自动拉起新宿主。
 
 ## License
 
