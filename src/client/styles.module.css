@@ -1,5 +1,7 @@
-/* dsh-web-watchdog panel styles — dark neutral theme */
-.launcher {
+/* dsh-web-watchdog panel styles — dark neutral theme
+   注意：所有类名带 wd 前缀，避免与其它插件的 CSS Module 哈希类名冲突
+   （portableCssModuleIds 按仓库内相对路径哈希，不同仓库同路径会撞名） */
+.wdLauncher {
   position: fixed;
   right: 84px;
   bottom: 22px;
@@ -17,11 +19,11 @@
   font-size: 22px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.launcher:hover {
+.wdLauncher:hover {
   transform: translateY(-2px) scale(1.05);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(143, 195, 255, 0.35);
 }
-.panel {
+.wdPanel {
   position: fixed;
   z-index: 2147482991;
   right: 22px;
@@ -39,7 +41,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
 }
-.titlebar {
+.wdTitlebar {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -48,13 +50,13 @@
   border-bottom: 1px solid rgba(143, 195, 255, 0.16);
   flex: 0 0 auto;
 }
-.title {
+.wdTitle {
   font-weight: 700;
   font-size: 14px;
   color: #dce9f7;
 }
-.spacer { flex: 1; }
-.winBtn {
+.wdSpacer { flex: 1; }
+.wdWinBtn {
   width: 26px;
   height: 26px;
   border-radius: 8px;
@@ -64,25 +66,25 @@
   cursor: pointer;
   font-size: 13px;
 }
-.winBtn:hover { background: rgba(143, 195, 255, 0.16); color: #e6fff2; }
-.body {
+.wdWinBtn:hover { background: rgba(143, 195, 255, 0.16); color: #e6fff2; }
+.wdBody {
   flex: 1;
   overflow: auto;
   padding: 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(143, 195, 255, 0.3) transparent;
 }
-.card {
+.wdCard {
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(143, 195, 255, 0.14);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 10px;
 }
-.cardTitle { font-weight: 650; color: #dce9f7; font-size: 13px; margin-bottom: 8px; }
-.grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; align-items: center; }
-.row { display: flex; align-items: center; gap: 8px; }
-.chip {
+.wdCardTitle { font-weight: 650; color: #dce9f7; font-size: 13px; margin-bottom: 8px; }
+.wdGrid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; align-items: center; }
+.wdRow { display: flex; align-items: center; gap: 8px; }
+.wdChip {
   font-size: 10.5px;
   padding: 2px 8px;
   border-radius: 999px;
@@ -91,14 +93,14 @@
   background: rgba(255, 255, 255, 0.04);
   white-space: nowrap;
 }
-.chipGreen { color: #9ef0bd; border-color: rgba(133, 227, 174, 0.45); }
-.chipAmber { color: #f3c979; border-color: rgba(243, 201, 121, 0.45); }
-.muted { color: #7fa39e; font-size: 11.5px; }
-.mono { font-family: 'Cascadia Code', Consolas, monospace; font-size: 11.5px; }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-.dotOk { background: #85e3ae; box-shadow: 0 0 6px rgba(133, 227, 174, 0.8); }
-.dotBad { background: #ff9d8a; box-shadow: 0 0 6px rgba(255, 157, 138, 0.8); }
-.logBox {
+.wdChipGreen { color: #9ef0bd; border-color: rgba(133, 227, 174, 0.45); }
+.wdChipAmber { color: #f3c979; border-color: rgba(243, 201, 121, 0.45); }
+.wdMuted { color: #7fa39e; font-size: 11.5px; }
+.wdMono { font-family: 'Cascadia Code', Consolas, monospace; font-size: 11.5px; }
+.wdDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.wdDotOk { background: #85e3ae; box-shadow: 0 0 6px rgba(133, 227, 174, 0.8); }
+.wdDotBad { background: #ff9d8a; box-shadow: 0 0 6px rgba(255, 157, 138, 0.8); }
+.wdLogBox {
   max-height: 220px;
   overflow: auto;
   background: rgba(0, 0, 0, 0.32);
@@ -110,7 +112,7 @@
   white-space: pre-wrap;
   margin: 0;
 }
-.btn {
+.wdBtn {
   padding: 5px 12px;
   border-radius: 8px;
   border: 1px solid rgba(143, 195, 255, 0.3);
@@ -119,11 +121,11 @@
   cursor: pointer;
   font-size: 12px;
 }
-.btn:hover { background: rgba(143, 195, 255, 0.22); }
-.btnDanger { border-color: rgba(255, 157, 138, 0.4); color: #ffb4a6; background: rgba(214, 116, 25, 0.1); }
-.btnDanger:hover { background: rgba(214, 116, 25, 0.25); }
-.btnSmall { padding: 2px 8px; font-size: 11px; }
-.errorBanner {
+.wdBtn:hover { background: rgba(143, 195, 255, 0.22); }
+.wdBtnDanger { border-color: rgba(255, 157, 138, 0.4); color: #ffb4a6; background: rgba(214, 116, 25, 0.1); }
+.wdBtnDanger:hover { background: rgba(214, 116, 25, 0.25); }
+.wdBtnSmall { padding: 2px 8px; font-size: 11px; }
+.wdErrorBanner {
   background: rgba(214, 116, 25, 0.16);
   border: 1px solid rgba(214, 116, 25, 0.4);
   color: #ffc9a0;
