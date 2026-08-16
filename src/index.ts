@@ -98,8 +98,10 @@ function ensureSupervisor(config: WatchdogConfig): void {
     // 插到 -WorkDir 值之后、-LogDir 之前（命名参数位置无关，但不能拆开相邻的参数/值对）
     args.splice(13, 0, '-RestartArgs', restartArgs)
   }
+  // 注意：不要用 detached:true —— 部分沙箱环境（本机 DSH 平台）会降权分离子进程，
+  // 导致监督进程无法写 pid/日志文件。非分离子进程在宿主退出后同样作为孤儿存活，
+  // 可以正常完成崩溃记录与自动重启。
   const child = spawn('powershell.exe', args, {
-    detached: true,
     stdio: 'ignore',
     windowsHide: true,
   })
