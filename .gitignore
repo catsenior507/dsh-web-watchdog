@@ -1,5 +1,6 @@
 node_modules/
 wd-test-data/
+wd-test-deploy/
 standalone-test-data/
 web-logs/
 *.log

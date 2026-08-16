@@ -1,8 +1,0 @@
-{
-  "port": 4796,
-  "supervisor": {
-    "backoffStartSec": 3,
-    "backoffMaxSec": 15,
-    "maxRestarts": 5
-  }
-}
