@@ -103,6 +103,14 @@ function ensureSupervisor(config: WatchdogConfig): void {
     stdio: 'ignore',
     windowsHide: true,
   })
+  child.on('error', (error) => {
+    // 监督进程无法启动时留下记录（例如受限环境禁止创建分离子进程）
+    try {
+      writeFileSync(config.supervisor.crashLog, '\n=== ' + new Date().toISOString() + ' | 监督进程启动失败: ' + String(error instanceof Error ? error.message : error) + ' ===\n', { flag: 'a' })
+    } catch {
+      // 忽略记录失败
+    }
+  })
   child.unref()
 }
 

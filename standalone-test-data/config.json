@@ -1,0 +1,18 @@
+{
+  "port": 4797,
+  "dataDir": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data",
+  "supervisor": {
+    "nodePath": "D:\\Program Files\\nodejs\\node.exe",
+    "binPath": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\test-host.mjs",
+    "restartArgs": [],
+    "workdir": "D:\\deepseek_harness\\igem\\dsh-web-watchdog",
+    "logDir": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data\\web-logs",
+    "crashLog": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data\\crash.log",
+    "requestFlag": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data\\restart-request.flag",
+    "pidFile": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data\\supervisor.pid",
+    "stateFile": "D:\\deepseek_harness\\igem\\dsh-web-watchdog\\standalone-test-data\\restart-state.txt",
+    "maxRestarts": 10,
+    "backoffStartSec": 10,
+    "backoffMaxSec": 600
+  }
+}
