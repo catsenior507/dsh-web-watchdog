@@ -8,6 +8,7 @@ export function WatchdogPanel(): JSX.Element {
   const [status, setStatus] = useState<WatchdogStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [confirmingShutdown, setConfirmingShutdown] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -34,6 +35,20 @@ export function WatchdogPanel(): JSX.Element {
       const res = await api.restart()
       setNotice(res.message)
       setConfirming(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const shutdown = async (): Promise<void> => {
+    setBusy(true)
+    setNotice(null)
+    try {
+      const res = await api.shutdown()
+      setNotice(res.message)
+      setConfirmingShutdown(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -96,6 +111,40 @@ export function WatchdogPanel(): JSX.Element {
                 </>
               ) : (
                 <button type="button" className={`${css.wdBtn} ${css.wdBtnDanger} ${css.wdBtnSmall}`} onClick={() => setConfirming(true)}>⚡ 计划重启</button>
+              )}
+            </div>
+
+            <div className={css.wdRow}>
+              {confirmingShutdown ? (
+                <>
+                  <span className={`${css.wdChip} ${css.wdChipAmber}`}>
+                    确认彻底关闭？看护进程与 dsh web 都会退出，页面随即断开，且不会自动恢复。
+                  </span>
+                  <button
+                    type="button"
+                    className={`${css.wdBtn} ${css.wdBtnDanger} ${css.wdBtnSmall}`}
+                    disabled={busy}
+                    onClick={() => void shutdown()}
+                  >
+                    确认关闭
+                  </button>
+                  <button
+                    type="button"
+                    className={`${css.wdBtn} ${css.wdBtnSmall}`}
+                    onClick={() => setConfirmingShutdown(false)}
+                  >
+                    取消
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={css.wdBtn}
+                  title="停止看护进程并关闭 dsh web；不会自动恢复"
+                  onClick={() => setConfirmingShutdown(true)}
+                >
+                  ⛔ 彻底关闭看护与后端
+                </button>
               )}
             </div>
           </div>

@@ -35,6 +35,11 @@ interface WatchdogConfig {
     maxRestarts: number
     backoffStartSec: number
     backoffMaxSec: number
+    /**
+     * 新宿主的就绪探针。重启后用它确认宿主真的在对外服务，
+     * 而不是只看进程还在 —— 后者会把「起来了但不健康」的宿主当成好的。
+     */
+    healthUrl: string
   }
 }
 
@@ -64,6 +69,10 @@ function defaultConfig(): WatchdogConfig {
       maxRestarts: 10,
       backoffStartSec: 10,
       backoffMaxSec: 600,
+      // 默认空 = 不做 HTTP 探针。探针 URL 配错会把正常宿主判成不健康，
+      // 而看门狗对不健康宿主的处置是杀掉它 —— 一个错误的默认值足以让看护
+      // 反过来变成破坏。要启用探针，设 DSH_WATCHDOG_HEALTH_URL。
+      healthUrl: process.env.DSH_WATCHDOG_HEALTH_URL ?? '',
     },
   }
 }
@@ -81,7 +90,21 @@ function supervisorScriptPath(): string {
  * 普通非分离 spawn 的子进程与宿主同属一个作业对象，会随宿主一起死——
  * 两者都无法让监督进程在宿主死后存活并完成重启。
  */
+/**
+ * 用户点过「彻底关闭」之后留下的闸门文件。
+ *
+ * 面板每 10 秒轮询一次 /status，而 /status 会调用 ensureSupervisor —— 没有这道
+ * 闸门的话，关闭请求会被下一次轮询立刻撤销，看门狗又活过来。
+ * 闸门是持久的：要重新启用看护，删掉这个文件即可。
+ * @param config - 看门狗配置。
+ * @returns 闸门文件路径。
+ */
+function stopFlagPath(config: WatchdogConfig): string {
+  return join(config.dataDir, 'shutdown.flag')
+}
+
 function ensureSupervisor(config: WatchdogConfig): void {
+  if (existsSync(stopFlagPath(config))) return
   const pid = readPidFile(config.supervisor.pidFile)
   if (pid !== null && isProcessAlive(pid)) return
   const script = supervisorScriptPath()
@@ -105,6 +128,8 @@ function ensureSupervisor(config: WatchdogConfig): void {
   if (restartArgs !== '') {
     args.splice(13, 0, '-RestartArgs', restartArgs)
   }
+  // 就绪探针放在最后追加：上面那个 splice 依赖固定下标，插在它前面会错位。
+  args.push('-HealthUrl', config.supervisor.healthUrl ?? 'http://127.0.0.1:3080/')
 
   // WMI 创建的进程不继承宿主环境变量：把环境快照落盘，
   // 监督进程重启宿主前先恢复（否则新 dsh web 会丢失 PATH/USERPROFILE 等）。
@@ -166,6 +191,45 @@ function crashLogTail(config: WatchdogConfig, lines: number): string[] {
     return all.slice(-lines)
   } catch {
     return []
+  }
+}
+
+/**
+ * 彻底关闭：先停监督进程，再让宿主自己退出。
+ *
+ * 顺序不能反。监督进程的职责就是「宿主死了就把它拉起来」，先杀宿主的话它会在
+ * 两秒内把宿主复活，用户看到的现象是「点了关闭，页面又回来了」。
+ *
+ * 宿主用 exit 0 退出，这是有意为之：监督进程把退出码 0 解释为正常关闭，
+ * 于是它记一笔 EXIT-0 然后自己收工，不会重启。
+ * @param config - 看门狗配置。
+ * @returns 给面板的回执。
+ */
+function shutdownEverything(config: WatchdogConfig): { ok: boolean; message: string } {
+  // 闸门先落盘，否则关闭过程中任何一次 ensureSupervisor 都会把它重新拉起来
+  try {
+    writeFileSync(stopFlagPath(config), new Date().toISOString(), 'utf8')
+  } catch {
+    // 写不动也要继续关闭，这是用户明确要求的事
+  }
+  const supervisorPid = readPidFile(config.supervisor.pidFile)
+  let supervisorStopped = false
+  if (supervisorPid !== null && isProcessAlive(supervisorPid)) {
+    try {
+      process.kill(supervisorPid)
+      supervisorStopped = true
+    } catch {
+      // 停不掉就在回执里说明，不假装成功
+    }
+  }
+  // 留一点时间让这个响应先发出去，然后宿主自己退出
+  setTimeout(() => { process.exit(0) }, 900)
+  return {
+    ok: true,
+    message:
+      '看门狗已彻底关闭' +
+      (supervisorStopped ? '（监督进程 ' + String(supervisorPid) + ' 已停止）' : '（没有在线的监督进程）') +
+      '，后端与网页端将在 1 秒内退出。要重新启用看护，删除 ' + stopFlagPath(config) + ' 后重新启动 dsh web。',
   }
 }
 
@@ -269,6 +333,10 @@ export function apply(ctx: Context): void {
             message: '重启请求已发送：监督进程将在 2 秒内停止并重新拉起 dsh web（浏览器会短暂断线，请稍候刷新页面）',
           }
           sendJson(res, 200, body)
+          return
+        }
+        if (path === '/api/watchdog/shutdown' && req.method === 'POST') {
+          sendJson(res, 200, shutdownEverything(config))
           return
         }
         sendJson(res, 404, { error: '未知 API 路径' })

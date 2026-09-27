@@ -1,4 +1,4 @@
-﻿# supervisor.ps1 — dsh web watchdog 监督进程（由 dsh-web-watchdog 插件托管生成）
+# supervisor.ps1 — dsh web watchdog 监督进程（由 dsh-web-watchdog 插件托管生成）
 # 职责：监督宿主进程（dsh web）。宿主异常退出（退出码 != 0）→ 记录 CRASH
 # （退出码 + stderr/stdout 末尾 + Windows 事件日志）→ 指数退避后自动重启；
 # 请求标记文件出现 → 视为计划重启（记录 PLANNED-RESTART，立即重启）。
@@ -17,7 +17,8 @@ param(
   [int]$MaxRestarts = 10,
   [int]$BackoffStartSec = 10,
   [int]$BackoffMaxSec = 600,
-  [string]$EnvFile = ''                            # 宿主环境快照 JSON（WMI 创建不继承环境，重启前恢复）
+  [string]$EnvFile = '',                           # 宿主环境快照 JSON（WMI 创建不继承环境，重启前恢复）
+  [string]$HealthUrl = ''                          # 宿主就绪探针；空 = 不检查（旧行为）
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -117,6 +118,47 @@ function Get-ExitCode([System.Diagnostics.Process]$procObj) {
   try { $procObj.Refresh(); return $procObj.ExitCode } catch { return 'unknown' }
 }
 
+function Test-HostHealthy {
+  # 重启之后必须确认新宿主真的能对外服务，而不是只看进程还在。
+  #
+  # 只看进程的话，「起来了但端口抢不到、HTTP 完全不响应」的宿主会被当成健康的：
+  # healthySince 被重置 → 崩溃计数归零 → 看门狗无限重启，而且它拉起的那个坏宿主
+  # 会占着端口，干扰用户后来手动启动的正常宿主。这正是 2026-09-27 那次事故：
+  # 陈旧监督进程用早已死掉的 HostPid 反复拉起宿主，最终拖垮子进程容器（0xC0000142）。
+  # 第一道：端口绑定失败。这个信号不需要任何配置，而且不会误报 ——
+  # 一个绑不上端口的宿主对新连接毫无用处，正是 09-27 那次事故的形态。
+  # 之所以把「无需配置」的判据放在最前面：如果只靠下面的 HTTP 探针，
+  # 而探针 URL 被配错了，看门狗会把每一个正常宿主都判成不健康然后杀掉它，
+  # 那比它原本的毛病更糟。
+  Start-Sleep -Seconds 3
+  foreach ($f in @($script:lastOut, $script:lastErr)) {
+    if ($f -ne '' -and (Test-Path $f)) {
+      if (Select-String -Path $f -Pattern 'EADDRINUSE|address already in use' -Quiet -ErrorAction SilentlyContinue) {
+        Write-Output "[supervisor] 新宿主端口被占用（EADDRINUSE），判定为不健康"
+        return $false
+      }
+    }
+  }
+
+  # 第二道：可选的 HTTP 就绪探针，默认关闭。
+  if ($HealthUrl -eq '') { return $true }
+  $deadline = (Get-Date).AddSeconds(45)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $res = Invoke-WebRequest -Uri $HealthUrl -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+      if ($res.StatusCode -ge 200) { return $true }
+    } catch {
+      # 401/403/404 都算「服务在」：dsh web 要 token，未授权是预期响应。
+      if ($_.Exception.Response -ne $null) {
+        $code = [int]$_.Exception.Response.StatusCode
+        if ($code -ge 200 -and $code -lt 500) { return $true }
+      }
+    }
+    Start-Sleep -Seconds 2
+  }
+  return $false
+}
+
 Write-Output "[supervisor] 启动：监督 PID $HostPid，日志 $CrashLog"
 $restartCount = Get-RestartCount
 $healthySince = Get-Date
@@ -171,6 +213,18 @@ while ($true) {
   $HostPid = $proc.Id
   Write-Output "[supervisor] 已重启宿主（新 PID $HostPid）"
   Add-Content -Path $CrashLog -Value "[重启] $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') 新宿主 PID $HostPid（第 $restartCount 次）" -Encoding UTF8
+
+  # 新宿主必须真的能服务，才继续监督它。
+  # 不健康就杀掉并回到循环顶部：下一轮会走「宿主已退出」的崩溃分支，
+  # 由它统一计数与退避（存活不足 60 秒 → 计数累加），因此这里不重复加。
+  if (-not (Test-HostHealthy)) {
+    $msg = "[supervisor] 新宿主 PID $HostPid 起来了但不健康：$HealthUrl 在 45 秒内没有响应。"
+    Write-Output $msg
+    Add-Content -Path $CrashLog -Value ($msg + " 已终止它，稍后重试。") -Encoding UTF8
+    Stop-Process -Id $HostPid -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    continue
+  }
 
   # 交接窗口：新宿主可能拉起自己的监督进程；最多等 6 秒。
   # 若未交接，本进程继续监督也安全（插件侧 ensureSupervisor 会复用已在线的监督进程，

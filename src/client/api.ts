@@ -26,4 +26,6 @@ export const api = {
   status: () => request<WatchdogStatus>('/api/watchdog/status'),
   log: (lines = 60) => request<{ ok: boolean; lines: string[]; crashLog: string }>('/api/watchdog/log?lines=' + lines),
   restart: () => request<RestartResult>('/api/watchdog/restart', { method: 'POST' }),
+  /** 彻底关闭：先停监督进程，再让宿主退出，且留下闸门不再自动武装。 */
+  shutdown: () => request<RestartResult>('/api/watchdog/shutdown', { method: 'POST' }),
 }
