@@ -1,4 +1,4 @@
-# supervisor.ps1 — dsh web watchdog 监督进程（由 dsh-web-watchdog 插件托管生成）
+﻿# supervisor.ps1 — dsh web watchdog 监督进程（由 dsh-web-watchdog 插件托管生成）
 # 职责：监督宿主进程（dsh web）。宿主异常退出（退出码 != 0）→ 记录 CRASH
 # （退出码 + stderr/stdout 末尾 + Windows 事件日志）→ 指数退避后自动重启；
 # 请求标记文件出现 → 视为计划重启（记录 PLANNED-RESTART，立即重启）。
@@ -31,6 +31,19 @@ $script:lastErr = ''
 # 清理遗留的重启请求标记：上一个监督进程未正常消费就会留下陈旧标记，
 # 若不清理，本进程会误把刚拉起的宿主当作“计划重启”立即杀死（自动关闭）。
 if (Test-Path $RequestFlag) { Remove-Item $RequestFlag -Force }
+
+# 监督进程的意义是「看护某个宿主」：它由那个宿主创建，并收到那个宿主的 pid。
+# 如果启动时这个 pid 已经不在了，说明这次创建是过期的（宿主已换代，或参数没绑上
+# 而退化成 0）。此时**绝不能**去拉起一个替代宿主——那会造出一个没有端口的僵尸
+# 宿主，它一失败就再拉一个，于是「拉宿主 → 端口冲突 → 退出 → 再拉」无限循环，
+# 而真正在服务的那个宿主毫发无伤，表现就是「计划重启完全无效」。
+# 观察到的事实：宿主 17900 一直占着 3080，而它不断产生绑不上端口的子宿主。
+if ($null -eq (Get-Process -Id $HostPid -ErrorAction SilentlyContinue)) {
+  $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+  Add-Content -Path $CrashLog -Value ('', ('=' * 80), "时间: $stamp | 监督进程退出 | -HostPid=$HostPid 在启动时已不存在") -Encoding UTF8
+  Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
+  exit 0
+}
 
 if (-not (Test-Path $CrashLog)) {
   Set-Content -Path $CrashLog -Value '# dsh web watchdog 异常退出记录' -Encoding UTF8
