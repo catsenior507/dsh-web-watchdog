@@ -200,9 +200,17 @@ function ensureSupervisor(config: WatchdogConfig): void {
 
   // 组装 WMI 创建命令行：先做双引号转义（PowerShell 把 "" 解析为字面引号），
   // 再对整体做单引号转义（' → ''，用于嵌入 -Arguments 的单引号字符串）。
-  const cmdline = ['powershell.exe', ...args]
-    .map((arg) => '"' + arg.replace(/"/g, '""') + '"')
-    .join(' ')
+  // Quote for CommandLineToArgvW, which is what CreateProcess parses with.
+  // Two rules matter here. A literal quote is escaped with a backslash, not by
+  // doubling. And a trailing backslash must be doubled, or it escapes the
+  // closing quote and swallows the rest of the command line into one argument -
+  // which is exactly what happened when a work directory of "C:\" turned the
+  // whole call into a parse error. Measured, not assumed.
+  const quoteArg = (arg: string): string => {
+    const escaped = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/\\$/, '\\\\')
+    return '"' + escaped + '"'
+  }
+  const cmdline = ['powershell.exe', ...args].map(quoteArg).join(' ')
   const wmiCmd = "(Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine='" + cmdline.replace(/'/g, "''") + "'}).ReturnValue"
 
   // 用一个短命 powershell 发出 WMI 创建请求（stdio 忽略，避免受限环境下的管道 EPERM）；
