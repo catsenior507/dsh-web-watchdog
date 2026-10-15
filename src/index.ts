@@ -8,7 +8,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -103,10 +103,44 @@ function stopFlagPath(config: WatchdogConfig): string {
   return join(config.dataDir, 'shutdown.flag')
 }
 
+/**
+ * Find a supervisor that is already running, whatever the pid file says.
+ *
+ * The pid file is bookkeeping, not truth. When it goes stale — which happens
+ * whenever a supervisor replaces itself — `isProcessAlive` reports the old pid
+ * as dead and this function would spawn a second supervisor beside the live
+ * one. Two supervisors both restart the host, and the host cannot tell them
+ * apart. Asking the OS who is actually running settles it.
+ * @returns the live supervisor pid, or null when there is none.
+ */
+function findRunningSupervisor(): number | null {
+  try {
+    const out = execFileSync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "(Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | " +
+        "Where-Object { $_.CommandLine -like '*supervisor.ps1*' } | " +
+        'Select-Object -First 1).ProcessId',
+    ], { encoding: 'utf8', timeout: 15_000 })
+    const pid = Number(out.trim())
+    return Number.isInteger(pid) && pid > 0 ? pid : null
+  } catch {
+    // If the query itself fails, fall back to the pid file rather than
+    // spawning blind: a duplicate supervisor is worse than a missing one.
+    return null
+  }
+}
+
 function ensureSupervisor(config: WatchdogConfig): void {
   if (existsSync(stopFlagPath(config))) return
   const pid = readPidFile(config.supervisor.pidFile)
   if (pid !== null && isProcessAlive(pid)) return
+  // The recorded pid is not alive. Before spawning, check whether a supervisor
+  // is running under a pid we simply failed to record: adopt it instead.
+  const live = findRunningSupervisor()
+  if (live !== null) {
+    try { writeFileSync(config.supervisor.pidFile, String(live), "utf8") } catch { /* bookkeeping only */ }
+    return
+  }
   const script = supervisorScriptPath()
   const args = [
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
