@@ -118,16 +118,24 @@ function stopFlagPath(config: WatchdogConfig): string {
  * adopted, its pid is written back, and the next check takes the cheap path.
  * @returns the live supervisor pid, or null when there is none.
  */
-function findRunningSupervisor(): number | null {
+function findRunningSupervisor(): { pid: number; hostPid: number | null } | null {
   try {
     const out = execFileSync('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-Command',
       "(Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | " +
         "Where-Object { $_.CommandLine -like '*supervisor.ps1*' } | " +
-        'Select-Object -First 1).ProcessId',
+        'ForEach-Object { "$($_.ProcessId)|$($_.CommandLine)" } | ' +
+        'Select-Object -First 1)',
     ], { encoding: 'utf8', timeout: 15_000 })
-    const pid = Number(out.trim())
-    return Number.isInteger(pid) && pid > 0 ? pid : null
+    const line = out.trim()
+    if (line === '') return null
+    const sep = line.indexOf('|')
+    const pid = Number(line.slice(0, sep))
+    if (!Number.isInteger(pid) || pid <= 0) return null
+    // Which host does it watch? That, not merely "a supervisor exists", is what
+    // decides whether it is still the right one for this process.
+    const host = /-HostPid\s+(\d+)/.exec(line.slice(sep + 1))
+    return { pid, hostPid: host === null ? null : Number(host[1]) }
   } catch {
     // If the query itself fails, fall back to the pid file rather than
     // spawning blind: a duplicate supervisor is worse than a missing one.
@@ -142,9 +150,19 @@ function ensureSupervisor(config: WatchdogConfig): void {
   // The recorded pid is not alive. Before spawning, check whether a supervisor
   // is running under a pid we simply failed to record: adopt it instead.
   const live = findRunningSupervisor()
-  if (live !== null) {
-    try { writeFileSync(config.supervisor.pidFile, String(live), "utf8") } catch { /* bookkeeping only */ }
+  if (live !== null && live.hostPid === process.pid) {
+    try { writeFileSync(config.supervisor.pidFile, String(live.pid), "utf8") } catch { /* bookkeeping only */ }
     return
+  }
+  if (live !== null) {
+    // A supervisor is running, but it watches a host that is no longer this
+    // one. Adopting it was the earlier mistake: it then refuses to restart the
+    // live host, because the pid it stops belongs to a dead process - the
+    // planned restart launched a second host that could not bind the port and
+    // exited, leaving the original untouched. Retire it and start a fresh
+    // supervisor bound to this process.
+    try { process.kill(live.pid, 'SIGTERM') } catch { /* already gone */ }
+    try { writeFileSync(config.supervisor.pidFile, '', 'utf8') } catch { /* bookkeeping only */ }
   }
   const script = supervisorScriptPath()
   const args = [
