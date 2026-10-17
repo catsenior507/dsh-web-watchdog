@@ -2,6 +2,8 @@
 
 export interface WatchdogStatus {
   ok: boolean
+  /** True while the shutdown gate is set, which means no care is running. */
+  gated: boolean
   plugin: string
   hostPid: number
   hostStartedAt: string

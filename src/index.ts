@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { RestartResult, WatchdogStatus } from './shared/types'
@@ -303,6 +303,7 @@ function buildStatus(config: WatchdogConfig): WatchdogStatus {
   const supervisorAlive = supervisorPid !== null && isProcessAlive(supervisorPid)
   return {
     ok: true,
+    gated: existsSync(stopFlagPath(config)),
     plugin: PLUGIN_ID,
     hostPid: process.pid,
     hostStartedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
@@ -398,6 +399,15 @@ export function apply(ctx: Context): void {
             message: '重启请求已发送：监督进程将在 2 秒内停止并重新拉起 dsh web（浏览器会短暂断线，请稍候刷新页面）',
           }
           sendJson(res, 200, body)
+          return
+        }
+        if (path === '/api/watchdog/enable' && req.method === 'POST') {
+          // The counterpart of shutdown. Without it the gate was a one-way valve:
+          // turning care off was a button, turning it back on was an undocumented
+          // file deletion plus a restart.
+          try { unlinkSync(stopFlagPath(config)) } catch { /* already gone */ }
+          ensureSupervisor(config)
+          sendJson(res, 200, buildStatus(config))
           return
         }
         if (path === '/api/watchdog/shutdown' && req.method === 'POST') {
