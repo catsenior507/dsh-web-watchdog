@@ -56,6 +56,20 @@ export function WatchdogPanel(): JSX.Element {
     }
   }
 
+  const enable = async (): Promise<void> => {
+    setBusy(true)
+    setNotice(null)
+    try {
+      await api.enable()
+      setNotice('enabled')
+      void refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const sv = status?.supervisor
 
   return (
@@ -102,6 +116,9 @@ export function WatchdogPanel(): JSX.Element {
             </div>
 
             <div className={css.wdRow}>
+              {status?.gated === true && (
+                <button type="button" className={`${css.wdBtn} ${css.wdBtnSmall}`} disabled={busy} onClick={() => void enable()} title="clear the gate and start a supervisor">▶ 重新启用看护</button>
+              )}
               <button type="button" className={`${css.wdBtn} ${css.wdBtnSmall}`} onClick={() => void refresh()}>↻ 刷新</button>
               {confirming ? (
                 <>

@@ -28,4 +28,6 @@ export const api = {
   restart: () => request<RestartResult>('/api/watchdog/restart', { method: 'POST' }),
   /** 彻底关闭：先停监督进程，再让宿主退出，且留下闸门不再自动武装。 */
   shutdown: () => request<RestartResult>('/api/watchdog/shutdown', { method: 'POST' }),
+  /** Re-enable care: clear the gate and start a supervisor. The inverse of shutdown. */
+  enable: () => request<WatchdogStatus>('/api/watchdog/enable', { method: 'POST' }),
 }
